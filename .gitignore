@@ -1,3 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+*.dist-info/
+*.manifest
+*.spec
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+__MACOSX/
+
+# Linux
+*~
+.cache/
+
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
 # Terraform
 .terraform/
 .terraform.lock.hcl
@@ -16,13 +53,16 @@ crash.*.log
 build/
 lambda_function.zip
 
-# Python
-__pycache__/
-*.pyc
-*.pyo
-.venv/
-venv/
+# Project artifacts
+eventguardian_audit.txt
+eventguardian_final_audit.txt
 
-# OS / editor noise
-.DS_Store
-.vscode/
+# Logs and coverage
+logs/
+.coverage
+.pytest_cache/
+
+# Miscellaneous
+*.pem
+.env
+dist/
