@@ -1,100 +1,62 @@
-# EventGuardian
+# ⚡ EventGuardian — Idempotent Serverless Event Pipeline
 
-## Project Overview
-EventGuardian is a **server‑less event processing pipeline** built on AWS. Clients publish JSON events to an Amazon SQS queue. A Lambda function consumes the messages, ensures **idempotent processing** using DynamoDB, stores the raw event payload in an S3 bucket, and logs detailed execution information to CloudWatch. Failed or poison messages are automatically routed to a dead‑letter queue (DLQ) for later analysis.
+[![Amazon SQS](https://img.shields.io/badge/AWS-Amazon_SQS-FF4F8B?logo=amazon-aws&logoColor=white)](https://aws.amazon.com/sqs/)
+[![AWS Lambda](https://img.shields.io/badge/AWS-Lambda_Python_3.13-FF9900?logo=amazon-aws&logoColor=white)](https://aws.amazon.com/lambda/)
+[![DynamoDB](https://img.shields.io/badge/AWS-DynamoDB_TTL-4053D6?logo=amazon-aws&logoColor=white)](https://aws.amazon.com/dynamodb/)
+[![Terraform](https://img.shields.io/badge/IaC-Terraform-844FBA?logo=terraform&logoColor=white)](https://www.terraform.io/)
 
-## Architecture Diagram
+A resilient serverless batch stream processing pipeline on AWS with strict **message idempotency**, partial batch response handling, and automated **Dead-Letter Queue (DLQ)** escalation.
+
+---
+
+## 🎯 Architectural Overview
+
+EventGuardian consumes event streams from Amazon SQS without duplicate side-effects or queue clogging. Using `aws-lambda-powertools`, it extracts composite keys (`[tenant_id, client_request_id]`) to maintain idempotency records in **Amazon DynamoDB** with a 1-hour TTL. Successful messages archive to **Amazon S3**, while failing payloads escalate to an SQS Dead-Letter Queue with CloudWatch alarms.
+
 ```mermaid
-flowchart TD
-    Client[Client/Application] -->|Send JSON| SQS[Amazon SQS (eventguardian‑events)]
-    SQS -->|Trigger| Lambda[Lambda (eventguardian‑processor)]
-    Lambda -->|Idempotency check| DynamoDB[Amazon DynamoDB (idempotency table)]
-    Lambda -->|Store event| S3[Amazon S3 (processed bucket)]
-    Lambda -->|Log| CloudWatch[CloudWatch Logs]
-    Lambda -->|DLQ on failure| DLQ[Amazon SQS (eventguardian‑dlq)]
-    DLQ -->|Alert| SNS[Amazon SNS (DLQ alerts)]
-    SNS -->|Email| Email[Stakeholder Email]
+flowchart LR
+    A[📬 Amazon SQS Queue] --> B[⚡ AWS Lambda Consumer]
+    B <--> C[🗄️ DynamoDB State Table]
+    B -->|Success Payload| D[🪣 Amazon S3 Archive]
+    B -.->|Failed maxReceive=3| E[🚨 Amazon SQS DLQ]
+    E --> F[📊 CloudWatch Metric Alarm]
 ```
 
-## AWS Services Used
-| Service | Why it was chosen |
-|--------|-------------------|
-| **Amazon SQS** | Decouples producers and consumers, provides at‑least‑once delivery, built‑in visibility timeout & DLQ support. |
-| **AWS Lambda** | Fully managed compute that scales automatically with queue depth; ideal for short‑lived processing. |
-| **Amazon DynamoDB** | Server‑less key‑value store for idempotency tokens; low latency and TTL for automatic cleanup. |
-| **Amazon S3** | Cheap, durable object storage for persisting raw events; enables downstream analytics. |
-| **Amazon CloudWatch** | Centralised logging and metrics for observability, alerts, and troubleshooting. |
-| **AWS IAM** | Fine‑grained least‑privilege permissions for Lambda to interact with the above services. |
-| **AWS SNS** (optional) | Sends email alerts when messages land in the DLQ. |
+---
 
-## Features
-- **Idempotent processing** using `aws-lambda-powertools` idempotency library.
-- **Automatic DLQ handling** with SNS email alerts.
-- **Server‑less, infrastructure‑as‑code** with Terraform.
-- **Structured logging** via `aws-lambda-powertools` logger.
-- **Configurable batch size** (10 messages per Lambda invocation).
-- **TTL‑based cleanup** of idempotency records.
+## ⚡ Key Engineering Features
 
-## Project Structure
-```
-.
-├── lambda_processor/          # Lambda source code (app.py)
-├── terraform/                # IaC – SQS, Lambda, DynamoDB, S3, IAM, etc.
-├── tests/                    # Integration test script & sample events
-├── .gitignore                # Ignored files and directories
-├── README.md                 # This document
-├── lambda_function.zip       # Pre‑built Lambda deployment package (ignored)
-└── ...
-```
+- **🛡️ DynamoDB Idempotency Layer:** Uses `aws-lambda-powertools` idempotency decorators to store token hashes in DynamoDB with a 1-hour TTL, short-circuiting duplicate requests.
+- **⚡ Partial Batch Item Handling:** Employs `process_partial_response()` so healthy messages commit while failing ones retry without blocking the batch.
+- **🚨 Automated DLQ Escalation:** Configures SQS redrive policy (`maxReceiveCount = 3`) to isolate poison payloads into an SQS DLQ with CloudWatch metric alarms.
+- **🏗️ 100% Terraform Provisioning:** Declaratively provisions SQS queues, Lambda functions, DynamoDB state tables, S3 buckets, and CloudWatch alarms (`sqs.tf`, `lambda.tf`, `dynamodb.tf`, `s3.tf`).
+- **🧪 Fault Simulation Suite:** Includes mock events (`events.json`) testing valid, duplicate, malformed, poison, and conflict payloads.
 
-## Setup Instructions
-1. **Prerequisites**
-   - AWS CLI configured with appropriate credentials.
-   - Terraform >= 1.3.
-   - Python 3.13 (runtime used by the Lambda).
-2. **Clone the repo**
-   ```bash
-   git clone https://github.com/sanmathik8/eventguardian.git
-   cd eventguardian
-   ```
-3. **Create a virtual environment & install dependencies**
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # on Windows: .venv\Scripts\activate
-   pip install -r lambda_processor/requirements.txt
-   ```
-4. **Build the Lambda deployment package**
-   ```bash
-   cd lambda_processor
-   zip -r ../lambda_function.zip .
-   cd ..
-   ```
-5. **Deploy the infrastructure**
-   ```bash
-   cd terraform
-   terraform init
-   terraform apply -var='budget_alert_email=you@example.com'
-   ```
-   The output will include the `event_queue_url` needed for the test script.
+---
 
-## Testing
-Run the provided test script to push a sample event:
+## 🛠️ Technology Stack
+
+- **Cloud Services:** Amazon SQS & SQS DLQ, AWS Lambda, Amazon DynamoDB, Amazon S3, CloudWatch Metrics, SNS Alarms
+- **Languages & Tools:** Python 3.13, AWS Lambda Powertools, Boto3, JMESPath
+- **Infrastructure as Code:** Terraform 1.14+
+
+---
+
+## 🚀 Quickstart & Usage
+
+### 1. Provision Serverless Infrastructure
 ```bash
-export EVENTGUARDIAN_QUEUE_URL=$(terraform -chdir=terraform output -raw event_queue_url)
-python tests/run_test.py tests/events.json
+cd terraform
+terraform init
+terraform apply
 ```
-Check CloudWatch logs for the Lambda execution and the S3 bucket for the stored event.
 
-## Failure Handling
-- **Message processing errors** → Lambda returns a failure; after `maxReceiveCount` (3) the message moves to the DLQ.
-- **DLQ alerts** → SNS triggers an email to the address defined in `budget_alert_email`.
-- **Idempotency conflicts** → Duplicate messages are ignored by the DynamoDB‑backed idempotency layer.
-- **Infrastructure drift** → Re‑run `terraform plan` to detect changes.
-
-## Future Improvements
-- Add **Step Functions** for multi‑stage processing (validation → enrichment → storage).
-- Implement **event schema validation** using `jsonschema`.
-- Enable **S3 event notifications** to trigger downstream analytics.
-- Add **CI/CD pipeline** (GitHub Actions) to automatically lint, test, and deploy.
-- Expand DLQ monitoring with **CloudWatch metric filters** and dashboards.
+### 2. Run Fault Simulation Suite
+```bash
+python lambda_processor/app.py
 ```
+
+---
+
+## 📄 License
+Distributed under the MIT License.
