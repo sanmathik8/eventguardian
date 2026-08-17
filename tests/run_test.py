@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 import boto3
 
@@ -27,12 +28,25 @@ except FileNotFoundError:
     print(f"❌ File not found: {file_path}")
     sys.exit(1)
 
-sqs = boto3.client("sqs", region_name="ap-south-1")
+# Dynamically extract region from SQS Queue URL
+match = re.search(r"sqs\.([a-z0-9-]+)\.amazonaws\.com", QUEUE_URL)
+region = match.group(1) if match else "ap-south-1"
 
-response = sqs.send_message(
-    QueueUrl=QUEUE_URL,
-    MessageBody=json.dumps(message)
-)
+sqs = boto3.client("sqs", region_name=region)
 
-print("✅ Message sent successfully!")
-print("MessageId:", response["MessageId"])
+if isinstance(message, list):
+    print(f"Detected list of {len(message)} messages. Sending individually...")
+    for idx, msg in enumerate(message, 1):
+        response = sqs.send_message(
+            QueueUrl=QUEUE_URL,
+            MessageBody=json.dumps(msg)
+        )
+        print(f"  [{idx}] Sent: {msg.get('event_id')} -> MessageId: {response['MessageId']}")
+    print("✅ All messages sent successfully!")
+else:
+    response = sqs.send_message(
+        QueueUrl=QUEUE_URL,
+        MessageBody=json.dumps(message)
+    )
+    print("✅ Message sent successfully!")
+    print("MessageId:", response["MessageId"])

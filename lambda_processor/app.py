@@ -92,7 +92,7 @@ def process_event(event_data: dict):
     s3.put_object(
         Bucket=OUTPUT_BUCKET,
         Key=f"events/{event_id}.json",
-        Body=json.dumps(event_data),
+        Body=json.dumps(event_data).encode("utf-8"),
         ContentType="application/json",
     )
 
