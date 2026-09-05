@@ -8,8 +8,6 @@ An idempotent, fault-tolerant serverless event processing pipeline on AWS using 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests: Pytest](https://img.shields.io/badge/Tests-8%20Passing-brightgreen.svg)](tests/)
 
-> **Note:** Looking for interview preparation, distributed systems trade-offs, and failure mode deep dives? See the dedicated **[INTERVIEW_GUIDE.md](INTERVIEW_GUIDE.md)**.
-
 ---
 
 ## Overview
@@ -147,7 +145,6 @@ eventguardian/
 │   └── poison/                     # Controlled poison pill test payload
 ├── build_lambda.py                 # Cross-platform packaging script (creates lambda_function.zip)
 ├── pytest.ini                      # Pytest discovery configuration
-├── INTERVIEW_GUIDE.md              # In-depth technical interview handbook and question bank
 ├── LICENSE                         # MIT License
 └── README.md                       # Project documentation
 ```

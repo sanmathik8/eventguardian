@@ -56,9 +56,10 @@ dist/
 *.zip
 lambda_function.zip
 
-# Project artifacts
+# Project artifacts and interview notes
 eventguardian_audit.txt
 eventguardian_final_audit.txt
+INTERVIEW_GUIDE.md
 
 # Logs and coverage
 logs/
