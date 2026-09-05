@@ -19,6 +19,8 @@ resource "aws_cloudwatch_metric_alarm" "dlq_messages" {
     aws_sns_topic.dlq_alerts.arn
   ]
 
+  treat_missing_data = "notBreaching"
+
   tags = {
     Project     = "EventGuardian"
     Environment = "Dev"
@@ -46,6 +48,8 @@ resource "aws_cloudwatch_metric_alarm" "lambda_errors" {
   alarm_actions = [
     aws_sns_topic.dlq_alerts.arn
   ]
+
+  treat_missing_data = "notBreaching"
 
   tags = {
     Project     = "EventGuardian"
