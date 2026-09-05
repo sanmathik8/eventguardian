@@ -34,31 +34,31 @@ In distributed cloud architectures, asynchronous stream processing systems rely 
 
 ```mermaid
 flowchart TD
-    subgraph Ingress [1. Event Ingress]
-        Producer[Producer / Client] -->|1. Send Event JSON| SQS[Amazon SQS: eventguardian-events<br/>Visibility: 180s | SSE Enabled]
+    subgraph Ingress ["1. Event Ingress"]
+        Producer["Producer / Client"] -->|"1. Send Event JSON"| SQS["Amazon SQS: eventguardian-events<br/>Visibility: 180s, SSE Enabled"]
     end
 
-    subgraph Processing [2. Serverless Processing]
-        SQS -->|2. Batch Poll: 10 records, 5s window| Lambda[AWS Lambda: eventguardian-processor<br/>Python 3.13 | 256MB | Timeout: 30s]
+    subgraph Processing ["2. Serverless Processing"]
+        SQS -->|"2. Batch Poll: 10 records, 5s window"| Lambda["AWS Lambda: eventguardian-processor<br/>Python 3.13, 256MB, Timeout: 30s"]
     end
 
-    subgraph Deduplication [3. Atomic Idempotency Layer]
-        Lambda <-->|3. Atomic Conditional Write<br/>attribute_not_exists id| DDB[(Amazon DynamoDB: eventguardian-idempotency<br/>Key: id | Billing: Pay-Per-Request)]
-        DDB -.->|Auto-purge after 1 Hour| DDB
+    subgraph Deduplication ["3. Atomic Idempotency Layer"]
+        Lambda -->|"3. Atomic Conditional Check<br/>attribute_not_exists id"| DDB[("Amazon DynamoDB: eventguardian-idempotency<br/>Key: id, Pay-Per-Request")]
+        DDB -.->|"Auto-purge after 1 Hour"| DDB
     end
 
-    subgraph Storage [4. Persistent Storage Sink]
-        Lambda -->|4. PutObject UTF-8 JSON| S3[Amazon S3: eventguardian-processed-*<br/>Key: events/event_id.json | AES256 | Versioned]
+    subgraph Storage ["4. Persistent Storage Sink"]
+        Lambda -->|"4. PutObject UTF-8 JSON"| S3["Amazon S3: eventguardian-processed-*<br/>Key: events/event_id.json, AES256"]
     end
 
-    subgraph Failure_Handling [5. Fault Isolation & Alerting]
-        Lambda -.->|Partial Batch Response<br/>batchItemFailures| SQS
-        SQS -.->|ReceiveCount > 3| DLQ[Amazon SQS DLQ: eventguardian-dlq<br/>Retention: 14 Days]
-        DLQ -->|ApproximateNumberOfMessagesVisible > 0| CW_DLQ[CloudWatch Alarm: dlq_messages]
-        Lambda -.->|Errors > 0| CW_ERR[CloudWatch Alarm: lambda_errors]
-        CW_DLQ --> SNS[Amazon SNS: eventguardian-dlq-alerts]
+    subgraph Failure_Handling ["5. Fault Isolation and Alerting"]
+        Lambda -.->|"Partial Batch Response<br/>batchItemFailures"| SQS
+        SQS -.->|"ReceiveCount > 3"| DLQ["Amazon SQS DLQ: eventguardian-dlq<br/>Retention: 14 Days"]
+        DLQ -->|"Visible Messages > 0"| CW_DLQ["CloudWatch Alarm: dlq_messages"]
+        Lambda -.->|"Errors > 0"| CW_ERR["CloudWatch Alarm: lambda_errors"]
+        CW_DLQ --> SNS["Amazon SNS: eventguardian-dlq-alerts"]
         CW_ERR --> SNS
-        SNS --> Email[On-Call Engineer Email]
+        SNS --> Email["On-Call Engineer Email"]
     end
 ```
 

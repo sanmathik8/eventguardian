@@ -50,28 +50,28 @@ In modern distributed cloud architectures, asynchronous stream processing system
 
 ```mermaid
 flowchart TD
-    subgraph Ingress [1. Event Ingress Layer]
-        A[📬 Event Producer] -->|Sends JSON Event| B[Amazon SQS: eventguardian-events<br/>Visibility: 180s | SSE Enabled]
-        B -->|Batch Delivery: max 10 records| C[⚡ AWS Lambda: app.py<br/>Python 3.13 | 256MB | Timeout: 30s]
+    subgraph Ingress ["1. Event Ingress Layer"]
+        A["Event Producer"] -->|"Sends JSON Event"| B["Amazon SQS: eventguardian-events<br/>Visibility: 180s, SSE Enabled"]
+        B -->|"Batch Delivery: max 10 records"| C["AWS Lambda: app.py<br/>Python 3.13, 256MB, Timeout: 30s"]
     end
 
-    subgraph State_Store [2. Idempotency & Locking Layer]
-        C <-->|Atomic Conditional PutItem<br/>attribute_not_exists id| D[(🗄️ Amazon DynamoDB: eventguardian-idempotency<br/>Key: id | Billing: Pay-per-Request)]
-        D -.->|Native Auto-Purge after 3600s| D
+    subgraph State_Store ["2. Idempotency and Locking Layer"]
+        C -->|"Atomic Conditional PutItem<br/>attribute_not_exists id"| D[("Amazon DynamoDB: eventguardian-idempotency<br/>Key: id, Pay-per-Request")]
+        D -.->|"Native Auto-Purge after 3600s"| D
     end
 
-    subgraph Sink [3. Persistent Storage Sink]
-        C -->|Valid UTF-8 JSON Payload| E[🪣 Amazon S3: eventguardian-processed-*<br/>Key: events/event_id.json | AES256 | Versioned]
+    subgraph Sink ["3. Persistent Storage Sink"]
+        C -->|"Valid UTF-8 JSON Payload"| E["Amazon S3: eventguardian-processed-*<br/>Key: events/event_id.json, AES256, Versioned"]
     end
 
-    subgraph Fault_Isolation [4. Granular Failure & Escalation Layer]
-        C -.->|Partial Batch Response<br/>batchItemFailures: msg-id| B
-        B -.->|ReceiveCount > 3 maxReceiveCount| F[🚨 Amazon SQS DLQ: eventguardian-dlq<br/>Retention: 14 days]
-        F -->|ApproximateNumberOfMessagesVisible > 0| G[📊 CloudWatch Metric Alarm: dlq_messages]
-        C -.->|Lambda Execution Errors > 0| H[📊 CloudWatch Metric Alarm: lambda_errors]
-        G --> I[📧 Amazon SNS Topic: eventguardian-dlq-alerts]
+    subgraph Fault_Isolation ["4. Granular Failure and Escalation Layer"]
+        C -.->|"Partial Batch Response<br/>batchItemFailures: msg-id"| B
+        B -.->|"ReceiveCount > 3 maxReceiveCount"| F["Amazon SQS DLQ: eventguardian-dlq<br/>Retention: 14 days"]
+        F -->|"ApproximateNumberOfMessagesVisible > 0"| G["CloudWatch Metric Alarm: dlq_messages"]
+        C -.->|"Lambda Execution Errors > 0"| H["CloudWatch Metric Alarm: lambda_errors"]
+        G --> I["Amazon SNS Topic: eventguardian-dlq-alerts"]
         H --> I
-        I --> J[🧑‍💻 Operator Email Alert]
+        I --> J["Operator Email Alert"]
     end
 ```
 
