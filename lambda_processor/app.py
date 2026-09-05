@@ -18,8 +18,8 @@ from aws_lambda_powertools.utilities.idempotency import (
 
 logger = Logger(service="eventguardian")
 
-TABLE_NAME = os.environ["IDEMPOTENCY_TABLE"]
-OUTPUT_BUCKET = os.environ["OUTPUT_BUCKET"]
+TABLE_NAME = os.environ.get("IDEMPOTENCY_TABLE", "eventguardian-idempotency")
+OUTPUT_BUCKET = os.environ.get("OUTPUT_BUCKET", "eventguardian-processed")
 
 s3 = boto3.client("s3")
 

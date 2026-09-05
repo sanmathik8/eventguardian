@@ -41,3 +41,11 @@ resource "aws_s3_bucket_lifecycle_configuration" "processed" {
     }
   }
 }
+
+resource "aws_s3_bucket_versioning" "processed" {
+  bucket = aws_s3_bucket.processed.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
