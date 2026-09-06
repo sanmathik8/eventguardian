@@ -18,12 +18,21 @@ from aws_lambda_powertools.utilities.idempotency import (
 
 logger = Logger(service="eventguardian")
 
-TABLE_NAME = os.environ.get("IDEMPOTENCY_TABLE", "eventguardian-idempotency")
-OUTPUT_BUCKET = os.environ.get("OUTPUT_BUCKET", "eventguardian-processed")
+TABLE_NAME = os.environ.get(
+    "IDEMPOTENCY_TABLE",
+    "eventguardian-idempotency",
+)
+
+OUTPUT_BUCKET = os.environ.get(
+    "OUTPUT_BUCKET",
+    "eventguardian-processed",
+)
 
 s3 = boto3.client("s3")
 
-persistence_layer = DynamoDBPersistenceLayer(table_name=TABLE_NAME)
+persistence_layer = DynamoDBPersistenceLayer(
+    table_name=TABLE_NAME
+)
 
 idempotency_config = IdempotencyConfig(
     event_key_jmespath="[tenant_id, client_request_id]",
@@ -32,7 +41,9 @@ idempotency_config = IdempotencyConfig(
     raise_on_no_idempotency_key=True,
 )
 
-processor = BatchProcessor(event_type=EventType.SQS)
+processor = BatchProcessor(
+    event_type=EventType.SQS
+)
 
 
 @idempotent_function(
@@ -42,15 +53,26 @@ processor = BatchProcessor(event_type=EventType.SQS)
 )
 def process_event(event_data: dict):
 
-    required_fields = ["tenant_id", "client_request_id", "event_id"]
+    required_fields = [
+        "tenant_id",
+        "client_request_id",
+        "event_id",
+    ]
 
     for field in required_fields:
         val = event_data.get(field)
 
         if not isinstance(val, str) or not val.strip():
-            raise ValueError(f"Missing or empty required field: {field}")
+            logger.error(f"Validation failed: {field}")
+            raise ValueError(
+                f"Missing or empty required field: {field}"
+            )
+
+    if "payload" not in event_data:
+        raise ValueError("Missing required field: payload")
 
     event_id = event_data["event_id"]
+    event_type = event_data.get("event_type")
 
     s3.put_object(
         Bucket=OUTPUT_BUCKET,
@@ -62,7 +84,7 @@ def process_event(event_data: dict):
     return {
         "status": "COMPLETED",
         "event_id": event_id,
-        "event_type": event_data.get("event_type"),
+        "event_type": event_type,
     }
 
 
