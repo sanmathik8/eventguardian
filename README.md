@@ -6,7 +6,7 @@ An idempotent, fault-tolerant serverless event processing pipeline on AWS using 
 [![Terraform](https://img.shields.io/badge/IaC-Terraform-purple.svg?logo=terraform)](https://www.terraform.io/)
 [![Python](https://img.shields.io/badge/Python-3.13-blue.svg?logo=python)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests: Pytest](https://img.shields.io/badge/Tests-8%20Passing-brightgreen.svg)](tests/)
+[![Tests: Pytest](https://img.shields.io/badge/Tests-12%20Passing-brightgreen.svg)](tests/)
 
 ---
 
@@ -136,13 +136,7 @@ eventguardian/
 │   └── budget.tf                   # AWS Budget cost guardrail
 ├── tests/
 │   ├── test_pipeline.py            # Automated offline integration test suite (Moto + Pytest)
-│   ├── run_test.py                 # Live CLI integration script for sending SQS messages
-│   ├── events.json                 # Sample multi-event batch dataset (including poison event)
-│   ├── valid/                      # Valid event test payload
-│   ├── duplicate/                  # Duplicate event payloads for idempotency verification
-│   ├── conflict/                   # Key collision test payloads with mutated contents
-│   ├── malformed/                  # Schema violation and malformed JSON test payloads
-│   └── poison/                     # Controlled poison pill test payload
+│   └── run_test.py                 # Live CLI integration script for sending SQS messages
 ├── build_lambda.py                 # Cross-platform packaging script (creates lambda_function.zip)
 ├── pytest.ini                      # Pytest discovery configuration
 ├── LICENSE                         # MIT License
@@ -259,24 +253,28 @@ pytest -v
 | `test_1_successful_event_processing` | Happy path execution | Valid event processes successfully; UTF-8 JSON object written to S3. |
 | `test_2_duplicate_event_idempotency` | Duplicate message arrival | Second identical call returns cached result; no redundant S3 write. |
 | `test_3_concurrent_duplicate_in_progress` | Concurrent race condition | Simultaneous request raises `IdempotencyAlreadyInProgressError`. |
-| `test_4_partial_batch_failures` | Batch with processing failure (5 events, 1 failure) | Only failing message ID returned in `batchItemFailures`; 4 valid events saved to S3. |
-| `test_5_processing_failure_error` | Downstream failure propagation | Unhandled runtime error (simulated S3 service failure) raises and propagates correctly. |
-| `test_6_missing_required_fields` | Technical contract validation | Missing or empty required fields (`tenant_id`, `client_request_id`, `event_id`) trigger `ValueError`. |
-| `test_7_payload_mutation_conflict` | Reused request ID with altered payload | Raises `IdempotencyValidationError`, preventing payload tampering. |
-| `test_8_invalid_json_body_partial_batch_failure` | Malformed JSON in SQS body | Unparseable JSON record is isolated in `batchItemFailures` without crashing batch. |
+| `test_4_partial_batch_failures` | Batch with failure (5 events, 1 failure) | Only failing message ID returned in `batchItemFailures`; 4 valid events saved to S3. |
+| `test_5_processing_failure_error` | Downstream failure propagation | Unhandled runtime error (simulated S3 failure) raises and propagates correctly. |
+| `test_6_missing_required_fields` | Missing required fields contract | Missing `tenant_id`, `client_request_id`, or `event_id` raises `ValueError`. |
+| `test_7_empty_and_invalid_field_types` | Type & empty string defense | Empty strings, whitespace, or non-string types raise `ValueError`. |
+| `test_8_payload_mutation_conflict` | Reused request ID with altered payload | Raises `IdempotencyValidationError`, preventing payload tampering. |
+| `test_9_invalid_json_body_partial_batch_failure` | Malformed JSON in SQS body | Unparseable JSON record is isolated in `batchItemFailures` without crashing batch. |
+| `test_10_optional_event_type_handled_gracefully` | Optional attribute omission | Processing succeeds when optional `event_type` is omitted, returning `None`. |
+| `test_11_all_batch_records_succeed` | Batch with zero errors | Empty failure response `{"batchItemFailures": []}` returned to SQS. |
+| `test_12_all_batch_records_fail` | Batch with 100% failures | When all records fail, `BatchProcessingError` is raised for CloudWatch metrics. |
 
 ### Running Live Tests against AWS (Optional)
 
-After applying Terraform, retrieve the queue URL and use `tests/run_test.py`:
+After applying Terraform, retrieve the queue URL and dispatch an event using `tests/run_test.py`:
 
 ```bash
 # On Linux/macOS:
 export EVENTGUARDIAN_QUEUE_URL=$(terraform -chdir=terraform output -raw event_queue_url)
-python tests/run_test.py tests/valid/valid.json
+python tests/run_test.py <path_to_json_file>
 
 # On Windows (PowerShell):
 $env:EVENTGUARDIAN_QUEUE_URL = (terraform -chdir=terraform output -raw event_queue_url)
-python tests/run_test.py tests/valid/valid.json
+python tests/run_test.py <path_to_json_file>
 ```
 
 ---

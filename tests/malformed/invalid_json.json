@@ -1,9 +1,0 @@
-{
-  "event_id": "evt-1005",
-  "event_type": "USER_CREATED",
-  "tenant_id": "tenant-01",
-  "client_request_id": "req-5005",
-  "timestamp": "2026-07-18T10:20:00Z",
-  "payload": {
-    "resource_id": "res-105",
-    "status": "ACTIVE"
