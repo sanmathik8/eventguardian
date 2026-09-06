@@ -154,15 +154,24 @@ def test_3_concurrent_duplicate_in_progress(test_env):
         app.process_event(event_data=event_payload)
 
 
-# Test 4: Partial batch failure (Batch of 5: A, B, C, D, E where C is poison)
-def test_4_partial_batch_failures(test_env):
+# Test 4: Partial batch failure (Batch of 5: A, B, C, D, E where C fails processing, e.g. S3 failure)
+def test_4_partial_batch_failures(test_env, monkeypatch):
     messages = [
         {"event_id": "evt-A", "event_type": "ORDER", "tenant_id": "t1", "client_request_id": "r-A", "timestamp": "t", "payload": {"item": "A"}},
         {"event_id": "evt-B", "event_type": "ORDER", "tenant_id": "t1", "client_request_id": "r-B", "timestamp": "t", "payload": {"item": "B"}},
-        {"event_id": "evt-C", "event_type": "POISON_EVENT", "tenant_id": "t1", "client_request_id": "r-C", "timestamp": "t", "payload": {"item": "C"}},
+        {"event_id": "evt-C", "event_type": "ORDER", "tenant_id": "t1", "client_request_id": "r-C", "timestamp": "t", "payload": {"item": "C"}},
         {"event_id": "evt-D", "event_type": "ORDER", "tenant_id": "t1", "client_request_id": "r-D", "timestamp": "t", "payload": {"item": "D"}},
         {"event_id": "evt-E", "event_type": "ORDER", "tenant_id": "t1", "client_request_id": "r-E", "timestamp": "t", "payload": {"item": "E"}},
     ]
+
+    real_put_object = app.s3.put_object
+
+    def mock_put_object(*args, **kwargs):
+        if kwargs.get("Key") == "events/evt-C.json":
+            raise RuntimeError("Simulated S3 failure for evt-C")
+        return real_put_object(*args, **kwargs)
+
+    monkeypatch.setattr(app.s3, "put_object", mock_put_object)
 
     records = [create_sqs_record(msg, f"msg-{chr(65+i)}") for i, msg in enumerate(messages)]
     sqs_event = {"Records": records}
@@ -186,20 +195,25 @@ def test_4_partial_batch_failures(test_env):
         s3.get_object(Bucket=os.environ["OUTPUT_BUCKET"], Key="events/evt-C.json")
 
 
-# Test 5: Repeated poison message behavior (raises RuntimeError)
-def test_5_poison_event_error(test_env):
-    poison_event = {
+# Test 5: Processing failure error propagation (simulated S3 failure raises RuntimeError)
+def test_5_processing_failure_error(test_env, monkeypatch):
+    event_payload = {
         "event_id": "evt-105",
-        "event_type": "POISON_EVENT",
+        "event_type": "ORDER_CREATED",
         "tenant_id": "tenant-01",
         "client_request_id": "req-005",
         "timestamp": "2026-09-01T10:00:00Z",
         "payload": {"data": "corrupt"}
     }
 
+    def mock_put_object(*args, **kwargs):
+        raise RuntimeError("Simulated S3 failure")
+
+    monkeypatch.setattr(app.s3, "put_object", mock_put_object)
+
     with pytest.raises(RuntimeError) as exc_info:
-        app.process_event(event_data=poison_event)
-    assert "Controlled poison event" in str(exc_info.value)
+        app.process_event(event_data=event_payload)
+    assert "Simulated S3 failure" in str(exc_info.value)
 
 
 # Test 6: Missing required fields (validation failure)
@@ -208,11 +222,22 @@ def test_6_missing_required_fields(test_env):
         "event_id": "evt-106",
         "event_type": "ORDER_CREATED",
         "tenant_id": "tenant-01",
-        # missing client_request_id, timestamp, payload
+        # missing client_request_id
     }
 
     with pytest.raises(Exception):
         app.process_event(event_data=malformed_event)
+
+    # Empty string check for required technical contract field
+    empty_field_event = {
+        "event_id": "   ",
+        "event_type": "ORDER_CREATED",
+        "tenant_id": "tenant-01",
+        "client_request_id": "req-006",
+    }
+    with pytest.raises(ValueError) as exc_info:
+        app.process_event(event_data=empty_field_event)
+    assert "Missing or empty required field: event_id" in str(exc_info.value)
 
 
 # Test 7: Same client_request_id with modified payload raises IdempotencyValidationError

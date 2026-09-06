@@ -43,40 +43,19 @@ processor = BatchProcessor(event_type=EventType.SQS)
     config=idempotency_config,
 )
 def process_event(event_data: dict):
-    required_fields = [
-        "event_id",
-        "event_type",
-        "tenant_id",
-        "client_request_id",
-        "timestamp",
-        "payload",
-    ]
-
-    missing = [
-        field
-        for field in required_fields
-        if field not in event_data
-    ]
-
-    if missing:
-        logger.error(
-            "Validation failed",
-            extra={
-                "missing_fields": missing,
-                "event": event_data,
-            },
-        )
-        raise ValueError(f"Missing fields: {missing}")
-
-    if event_data["event_type"] == "POISON_EVENT":
-        logger.error(
-            "Poison event detected",
-            extra={
-                "event_id": event_data["event_id"],
-                "tenant_id": event_data["tenant_id"],
-            },
-        )
-        raise RuntimeError("Controlled poison event")
+    required_fields = ["tenant_id", "client_request_id", "event_id"]
+    for field in required_fields:
+        val = event_data.get(field)
+        if not isinstance(val, str) or not val.strip():
+            logger.error(
+                "Validation failed: missing or invalid required field",
+                extra={
+                    "field": field,
+                    "value": val,
+                    "event": event_data,
+                },
+            )
+            raise ValueError(f"Missing or empty required field: {field}")
 
     event_id = event_data["event_id"]
 
@@ -84,7 +63,7 @@ def process_event(event_data: dict):
         "Processing event",
         extra={
             "event_id": event_id,
-            "event_type": event_data["event_type"],
+            "event_type": event_data.get("event_type"),
             "tenant_id": event_data["tenant_id"],
         },
     )
@@ -100,7 +79,7 @@ def process_event(event_data: dict):
         "Event processed successfully",
         extra={
             "event_id": event_id,
-            "event_type": event_data["event_type"],
+            "event_type": event_data.get("event_type"),
             "bucket": OUTPUT_BUCKET,
         },
     )
@@ -108,7 +87,7 @@ def process_event(event_data: dict):
     return {
         "status": "COMPLETED",
         "event_id": event_id,
-        "event_type": event_data["event_type"],
+        "event_type": event_data.get("event_type"),
     }
 
 

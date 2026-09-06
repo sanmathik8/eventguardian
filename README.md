@@ -259,9 +259,9 @@ pytest -v
 | `test_1_successful_event_processing` | Happy path execution | Valid event processes successfully; UTF-8 JSON object written to S3. |
 | `test_2_duplicate_event_idempotency` | Duplicate message arrival | Second identical call returns cached result; no redundant S3 write. |
 | `test_3_concurrent_duplicate_in_progress` | Concurrent race condition | Simultaneous request raises `IdempotencyAlreadyInProgressError`. |
-| `test_4_partial_batch_failures` | Batch with poison pill (5 events, 1 poison) | Only poison message ID returned in `batchItemFailures`; 4 valid events saved to S3. |
-| `test_5_poison_event_error` | Controlled error trigger | Explicit `RuntimeError` thrown for `POISON_EVENT` type. |
-| `test_6_missing_required_fields` | Schema validation | Missing required fields trigger `ValueError` and log error details. |
+| `test_4_partial_batch_failures` | Batch with processing failure (5 events, 1 failure) | Only failing message ID returned in `batchItemFailures`; 4 valid events saved to S3. |
+| `test_5_processing_failure_error` | Downstream failure propagation | Unhandled runtime error (simulated S3 service failure) raises and propagates correctly. |
+| `test_6_missing_required_fields` | Technical contract validation | Missing or empty required fields (`tenant_id`, `client_request_id`, `event_id`) trigger `ValueError`. |
 | `test_7_payload_mutation_conflict` | Reused request ID with altered payload | Raises `IdempotencyValidationError`, preventing payload tampering. |
 | `test_8_invalid_json_body_partial_batch_failure` | Malformed JSON in SQS body | Unparseable JSON record is isolated in `batchItemFailures` without crashing batch. |
 
