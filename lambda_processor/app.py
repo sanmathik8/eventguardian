@@ -23,9 +23,7 @@ OUTPUT_BUCKET = os.environ.get("OUTPUT_BUCKET", "eventguardian-processed")
 
 s3 = boto3.client("s3")
 
-persistence_layer = DynamoDBPersistenceLayer(
-    table_name=TABLE_NAME
-)
+persistence_layer = DynamoDBPersistenceLayer(table_name=TABLE_NAME)
 
 idempotency_config = IdempotencyConfig(
     event_key_jmespath="[tenant_id, client_request_id]",
@@ -43,45 +41,22 @@ processor = BatchProcessor(event_type=EventType.SQS)
     config=idempotency_config,
 )
 def process_event(event_data: dict):
+
     required_fields = ["tenant_id", "client_request_id", "event_id"]
+
     for field in required_fields:
         val = event_data.get(field)
+
         if not isinstance(val, str) or not val.strip():
-            logger.error(
-                "Validation failed: missing or invalid required field",
-                extra={
-                    "field": field,
-                    "value": val,
-                    "event": event_data,
-                },
-            )
             raise ValueError(f"Missing or empty required field: {field}")
 
     event_id = event_data["event_id"]
-
-    logger.info(
-        "Processing event",
-        extra={
-            "event_id": event_id,
-            "event_type": event_data.get("event_type"),
-            "tenant_id": event_data["tenant_id"],
-        },
-    )
 
     s3.put_object(
         Bucket=OUTPUT_BUCKET,
         Key=f"events/{event_id}.json",
         Body=json.dumps(event_data).encode("utf-8"),
         ContentType="application/json",
-    )
-
-    logger.info(
-        "Event processed successfully",
-        extra={
-            "event_id": event_id,
-            "event_type": event_data.get("event_type"),
-            "bucket": OUTPUT_BUCKET,
-        },
     )
 
     return {
@@ -96,8 +71,9 @@ def record_handler(record: SQSRecord):
     return process_event(event_data=event_data)
 
 
-@logger.inject_lambda_context(log_event=True)
+@logger.inject_lambda_context
 def lambda_handler(event, context):
+
     idempotency_config.register_lambda_context(context)
 
     return process_partial_response(
